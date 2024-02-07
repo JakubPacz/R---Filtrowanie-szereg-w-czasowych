@@ -1,0 +1,448 @@
+---
+title: "Filtrowanie szeregów"
+author: "Jakub Pączek, Anna Materka"
+date: "styczeń 2024r."
+output: 
+  ioslides_presentation:
+    transition: slower
+    css: style.css
+    logo: logo_wz.png
+runtime: shiny
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Wstęp
+
+Projekt ma na celu przygotowanie zestawienia danych potrzebnego do analizy szeregów czasowych dla spółek z indeksu WIG20, wykorzystując interaktywną aplikację shiny. Celem tego badania jest zrozumienie zachowań cenowych wybranych firm na polskim rynku giełdowym. Dzięki zastosowaniu różnorodnych technik, takich jak średnie dla poszczególnych miesięcy, średnie ruchome, logarytmiczne dzienne stopy zwrotu, czy średnie ruchome logarytmicznych stóp zwrotu, projekt umożliwia analizę trendów, zmniejszenie fluktuacji oraz dostarcza narzędzi do prognozowania. Aplikacja może stanowić praktyczne narzędzie wspomagające podejmowanie decyzji inwestycyjnych, co może być wartościowe dla inwestorów, analityków finansowych oraz badaczy rynku kapitałowego.    
+
+       
+**Filtrowanie szeregów czasowych** to technika analizy danych, która ma na celu wyodrębnienie istotnych wzorców i struktur z czasowych zmian w szeregach danych. Jest szeroko stosowane w analizie ekonomicznej, finansowej, meteorologicznej i innych dziedzinach, gdzie obserwacje gromadzone są w określonych odstępach czasowych.
+
+## Biblioteki
+
+```{r, warning=FALSE, message=FALSE, echo = TRUE}
+library(shinydashboard)
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(zoo)
+library(tidyverse)
+library(DT)
+```
+
+Biblioteki `shiny` i `shinydashboard` są wykorzystane do utworzenia interaktywnego interfejsu i organizacji jego elementów. `kableExtra` oraz `DT` zostały użyte w celu przedstawienia wyników pod postacią tabel. Pakiet `zoo` został wykorzystany do manipulacji danymi czasowymi. `dplyr` posłużył do operacji na ramkach danych, za pomocą `ggplot2` stworzone zostały wykresy, natomiast `tidyverse` posłużył do ładowania kilku różnch pakietów.
+
+## Pozyskanie danych
+
+```{r}
+url <- "https://stooq.pl/q/d/l/?s=ale&d1=20230101&d2=20240108&i=d"
+dane_allegro <- read.csv(paste0(url))
+datatable(dane_allegro, 
+          caption = "Dane dotyczące spółki Allegro od 01.01.2023r. do 08.01.2024r.",
+          options = list(pageLength = 5, scrllX = TRUE, scrollY = TRUE, searching = FALSE))
+```
+
+## Średnie miesięczne
+
+Średnia miesięczna jest statystyką wyliczaną jako średnia wartość danego wskaźnika lub zmiennej w danym miesiącu. Pozwala ona redukować fluktuacje zakłócające analizę długoterminowych trendów. Może pomóc w identyfikacji trendów oraz analizie sezonowości, ponad to wygładzając szeregi czasowe, eliminuje przypadkowe fluktuacje, co pomaga w przeprowadzniu prognozowania.
+
+**Wzór:**   
+
+\[ \text{Średnia miesięczna} = \frac{X_{t-1} + X_{t-2} + \ldots + X_{t-n+1}}{n} \]
+
+**gdzie:**   
+**\( X_{t-1}, X_{t-2}, \ldots, X_{t-n+1} \)** to wartości w poszczególnych miesiącach,   
+**n** - liczba obserwacji w danym miesiącu
+
+## Obliczenie średnich miesięcznych dla spółki Allegro
+
+```{r, message=FALSE, results='asis'}
+dane_allegro$Rok <- lubridate::year(dane_allegro$Data)
+dane_allegro$Miesiac <- lubridate::month(dane_allegro$Data)
+
+# Grupowanie danych według roku i miesiąca i obliczanie średniej dla każdej grupy
+srednie_miesieczne <- dane_allegro %>%
+  group_by(Rok, Miesiac) %>%
+  summarise(Srednia = mean(Zamkniecie, na.rm = TRUE))
+
+datatable(srednie_miesieczne, 
+          caption = "Średnich miesięcznych dla spółki Allegro",
+          options = list(scrllX = TRUE, scrollY = TRUE, searching = FALSE))
+```
+
+## Średnia ruchoma 
+Średnia ruchoma to metoda statystyczna powszechnie stosowana w analizie szeregów czasowych, znana również jako filtr ruchomy. Jest często wykorzystywana do wygładzania szeregów czasowych poprzez uśrednianie wartości punktów danych w określonym oknie czasowym. Ta technika pozwala na identyfikację trendów, zmniejszenie fluktuacji oraz uzupełnienie wartości brakujących. Popularne warianty to średnia ruchoma prostokątna, ważona i wykładnicza, z których każda oferuje różne poziomy gładkości i reakcji na zmiany w danych czasowych.   
+
+**Wzór:**   
+
+\[ SMA = \frac{p_0 + p_1 + \ldots + p_{n-1}}{n} \]
+**gdzie:**   
+**r~l~** - logarytmiczna stopa zwrotu akcji   
+**K~l~** - cena instrumentu finansowego
+
+
+## Średnie ruchome
+<div class="columns-2" style="width: 800px; color: Brown">   
+### Średnie ruchome miesięczne
+```{r}
+# Sprawdzenie, czy dane istnieją
+if (!is.null(dane_allegro)) {
+  # Obliczenie średnich ruchomych
+  srednie_ruchome_mies <- data.frame(Data = dane_allegro$Data, Srednie = stats::filter(dane_allegro$Zamkniecie, sides = 2, rep(1, 20)/20))
+}
+if (!is.null(srednie_ruchome_mies) && nrow(srednie_ruchome_mies) > 0) {
+
+    kable(srednie_ruchome_mies, format = "html") %>%
+      kable_styling(bootstrap_options = "striped", full_width = FALSE)
+  } else {
+    cat("Brak danych do wyświetlenia.")
+  }
+```
+
+### Ruchome średnie dwumiesięczne
+
+```{r}
+if(!is.null(dane_allegro)){
+  srednie_ruchome_2mies <- data.frame(cbind(Data = dane_allegro$Data, Srednie = stats::filter(dane_allegro$Zamkniecie, sides = 2, rep(1, 40)/40)))
+}
+if (!is.null(srednie_ruchome_2mies) && nrow(srednie_ruchome_2mies) > 0) {
+
+    kable(srednie_ruchome_2mies, format = "html") %>%
+      kable_styling(bootstrap_options = "striped", full_width = FALSE)
+  } else {
+    cat("Brak danych do wyświetlenia.")
+  }
+```
+</div>
+
+## Wykres ruchomych średnich miesięcznych 
+
+```{r}
+srednie_ruchome_mies <- srednie_ruchome_mies[!is.na(srednie_ruchome_mies$Srednie),]
+    ggplot(srednie_ruchome_mies, aes(x = as.Date(Data), y = as.numeric(Srednie), group = 1)) +
+      geom_line(col = "blue") +
+      labs(
+        title = "Średnie ruchome miesięczne", x= "Data", y = "Średnie"
+      ) +
+      theme(title = element_text(size=20))
+```
+
+
+## Wykres średnich ruchomych dwumiesięcznych
+```{r}
+srednie_ruchome_2mies <- srednie_ruchome_2mies[!is.na(srednie_ruchome_2mies$Srednie),]
+    ggplot(srednie_ruchome_2mies, aes(x = as.Date(Data), y = as.numeric(Srednie), group = 1)) +
+      geom_line(col = "red") +
+      labs(
+        title = "Średnie ruchome dwumiesięczne", x= "Data", y = "Średnie"
+      ) +
+      theme(title = element_text(size=20))
+```
+
+## Logarytmiczna dzienna stopa zwrtotu
+
+Jest to miara zmiany wartości jakiegoś aktywa lub inwestycji w czasie, wyraża się ją jako logarytm naturalny stosunku wartości początkowej i końcowej. Pozwala na łatwe porównanie inwestycji o różnych wielkościach i okresach trwania. Powszechnie używa się jej do oceny inwestycji. Dostarcza również infromacji o zmienności i ryzyku związanym z inwestycją.    
+    
+       
+**Wzór:**
+\[ r_l = \ln\left(\frac{K_l}{K_{l-1}}\right) \]
+
+## Logarytmiczne stopy zwrotu Allegro
+
+```{r, message=FALSE}
+if (!is.null(dane_allegro)) {
+  stopy_log <- dane_allegro %>% mutate(StopyZwrotu = log(Zamkniecie/Otwarcie)) %>%
+    select(Data, StopyZwrotu)
+  
+  datatable(stopy_log, 
+            caption = "Logarytmiczne stopy zwrotu spółki Allegro od 01.01.2023r. do 08.01.2024r.",
+            options = list(pageLength = 5, scrllX = TRUE, scrollY = TRUE, searching = FALSE))
+} else {
+  cat("Brak danych dane_allegro. Sprawdź, czy dane są dostępne.")
+}
+```
+
+## Średnie ruchome logarytmicznych stóp zwrotu
+<div class="columns-2" style="width: 800px; color: Brown">   
+### Średnie ruchome miesięczne
+```{r}
+if(!is.null(stopy_log)){
+    stopy_log_ruch_mies <- data.frame(cbind(Data = stopy_log$Data, Średnie = round(stats::filter(stopy_log$StopyZwrotu, sides = 2, rep(1, 20)/20), 5)))
+  }
+if (!is.null(stopy_log_ruch_mies) && nrow(stopy_log_ruch_mies) > 0) {
+
+    kable(stopy_log_ruch_mies, format = "html") %>%
+      kable_styling(bootstrap_options = "striped", full_width = FALSE)
+  } else {
+    cat("Brak danych do wyświetlenia.")
+  }
+```
+
+### Ruchome średnie dwumiesięczne
+
+```{r}
+if(!is.null(stopy_log)){
+    stopy_log_ruch_2mies <- data.frame(cbind(Data = stopy_log$Data, Średnie = round(stats::filter(stopy_log$StopyZwrotu, sides = 2, rep(1, 40)/40), 5)))
+  }
+if (!is.null(stopy_log_ruch_2mies) && nrow(stopy_log_ruch_2mies) > 0) {
+
+    kable(stopy_log_ruch_2mies, format = "html") %>%
+      kable_styling(bootstrap_options = "striped", full_width = FALSE)
+  } else {
+    cat("Brak danych do wyświetlenia.")
+  }
+```
+</div>
+
+## Wykres średniej ruchomej miesięcznej logarytmicznej stopy zwrotu
+
+```{r}
+stopy_log_ruch_mies <- stopy_log_ruch_mies[!is.na(stopy_log_ruch_mies$Średnie),]
+    ggplot(stopy_log_ruch_mies, aes(x = as.Date(Data), y = as.numeric(Średnie), group = 1)) +
+      geom_line(col = "blue") +
+      labs( x= "Data", y = "Średnie") +
+      theme(title = element_text(size=20))
+```
+
+## Wykres średniej ruchomej dwumiesięcznej logarytmicznej stopy zwrotu
+
+```{r}
+stopy_log_ruch_2mies <- stopy_log_ruch_2mies[!is.na(stopy_log_ruch_2mies$Średnie),]
+    ggplot(stopy_log_ruch_2mies, aes(x = as.Date(Data), y = as.numeric(Średnie), group = 1)) +
+      geom_line(col = "red") +
+      labs( x= "Data", y = "Średnie") +
+      theme(title = element_text(size=20))
+```
+
+## O naszej aplikacji shiny
+
+Aplikacja pozwala użytkownikowi wybrać jedną z 20 firmy oraz okresu, z którego dane chciałby zobaczyć. Następnie po załadowaniu danych w zależnośći od tego co użytkownik chcicałby zobaczyć może wybrać z menu:   
+- średnie dla miesięcy,  
+- średnie ruchome miesięczne,   
+- średnie ruchome dwumiesięczne,   
+- wykresy średnich ruchomych,  
+- logarytmiczne dzienne stopy zwrotu,   
+- średnie ruchome miesięczne logarytmicznych dziennych stóp zwrotu,   
+- średnie ruchome dwumiesięczne logarytmicznych dziennych stóp zwrotu,   
+- wykresy średnich ruchomych logarytmicznych stóp zwrotu.   
+Projekt stanowi narzędzie do badania zachowań cenowych spółek na przestrzeni czasu i może być przydatny dla inwestorów, analityków finansowych czy badaczy rynku.
+
+## Aplikacja shiny
+
+```{r}
+spskr <- c("acp", "ale", "alr", "cdr", "cps", "dnp", "jsw", "kgh", "kru", "kty", "lpp", "mbk", "opl", "pco", "peo", "pge", "pkn", "pko", "pzu", "spl")
+sp <- c("ASSECOPOL", "ALLEGRO", "ALIOR", "CDPROJECT", "CYFRPLSAT", "DINOPL", "JSW", "KGHM", "KRUK", "KETY", "LPP", "MBANK", "ORANGEPL", "PEPCO", "PEKAO", "PGE", "PKNORLEN", "PKOBP", "PZU", "SANPL")
+
+
+ui <- dashboardPage(
+
+    dashboardHeader(title = "Filtrowanie szeregów czasowych dla spółek z indeksu WIG20"),
+
+    dashboardSidebar(
+            selectInput(
+              'spolka', h3("Wybierz spółkę"),
+              choices = sp, 
+              multiple=FALSE
+            ),
+            h3("Wybierz zakres dat", style = "margin-left: 15px"),
+            dateInput(
+              'poczatek', "Data początkowa", min = 1994-04-16, max = Sys.Date()
+            ),
+            dateInput(
+              'koniec', "Data końcowa", min = 1994-04-16, max = Sys.Date()
+            ),
+            actionButton("otworzURL", "Załaduj dane"),
+            sidebarMenu(
+              h3("Menu", style = "margin-left: 15px"),
+              menuItem("Średnie dla miesięcy", tabName = "srm0"),
+              menuItem("Średnie ruchome miesięczne", tabName = "srm1"),
+              menuItem("Średnie ruchome dwumiesięczne", tabName = "sr2m"),
+              menuItem("Wykresy średniej ruchomej", tabName = "wykresy12"),
+              menuItem(p("Logarytmiczne dzienne stopy", br(), "zwrotu"), tabName = "stz"),
+              menuItem("Średnia ruchoma miesięczna", tabName = "stz1"),
+              menuItem("Średnia ruchoma dwumiesięczna", tabName = "stz2"),
+              menuItem(p("Wykres średniej ruchomej", br(), "logarytmicznych stóp zwrotu"), tabName = "wykresy34")
+            )
+    ),
+    dashboardBody(
+      fluidRow(
+        tabItems(
+        tabItem(
+          tabName = "srm0",
+          h2("Średnie dla poszczególnych miesięcy", style = "margin-left: 15px"),
+          tableOutput("srm")
+          ),
+        tabItem(
+          tabName = "srm1",
+          h2("Średnie ruchome miesięczne", style = "margin-left: 15px"),
+          tableOutput("sr1m"),
+        ),
+        tabItem(
+          tabName = "sr2m",
+          h2("Średnie ruchome dwumiesięczne", style = "margin-left: 15px"),
+          tableOutput("sr2m"),
+        ),
+        tabItem(
+          tabName = "wykresy12",
+          plotOutput("wykres1"),
+          plotOutput("wykres2")
+        ),
+        tabItem(
+          tabName = "stz",
+          h2("Logarytmiczne stopy zwrotu",style = "margin-left: 15px" ),
+          tableOutput("stz")
+        ),
+        tabItem(
+          tabName = "stz1",
+          h2("Średnie ruchome miesięczne logarytmicznych stóp zwrotu", style = "margin-left: 15px"),
+          tableOutput("stz1"),
+        ),
+        tabItem(
+          tabName = "stz2",
+          h2("Średnie ruchome dwumiesięczne logarytmicznych stóp zwrotu", style = "margin-left: 15px"),
+          tableOutput("stz2"),
+        ),
+        tabItem(
+          tabName = "wykresy34",
+          plotOutput("wykres3"),
+          plotOutput("wykres4")
+        )
+        )
+      )
+    )
+        
+
+)
+
+server <- function(input, output) {
+  
+  dane <- reactiveVal()
+  
+  observeEvent(input$otworzURL, {
+    req(input$otworzURL)
+    skrot <- spskr[sp == input$spolka]
+    pocz <- as.integer(format(input$poczatek, "%Y%m%d")) - 1
+    kon <- as.integer(format(input$koniec, "%Y%m%d")) + 1
+    url <- paste0("https://stooq.pl/q/d/l/?s=", skrot, "&d1=", pocz, "&d2=", kon, "&i=d")
+    x <- data.frame(read.csv(url(url)))
+    x[,1] <- format(as.Date(x[,1], "%Y-%m-%d"))
+    if(x[1,1] > pocz){
+      showNotification(paste("Dane dostępne od", x[1,1]))
+    }
+    dane(x)
+  })
+  output$srm <- renderTable({
+    if(!is.null(dane())){
+    dane() %>%
+      mutate(Rok_miesiąc = format(as.Date(Data), "%Y-%m")) %>%
+      group_by(Rok_miesiąc) %>%
+      summarize("Średnie dla miesięcy" = mean(Zamkniecie))
+    }
+  })
+  
+  output$sr1m <- renderTable({
+    x <- dane()
+    if(!is.null(x)){
+    data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$Zamkniecie, sides = 2, rep(1, 20)/20)))
+    }})
+  
+  output$sr2m <- renderTable({
+    x <- dane()
+    if(!is.null(x)){
+    data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$Zamkniecie, sides = 2, rep(1, 40)/40)))
+  }})
+  
+  output$wykres1 <- renderPlot({
+    x <- dane()
+    if(!is.null(x)){
+    sred <- data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$Zamkniecie, sides = 2, rep(1, 20)/20)))
+    sred <- sred[!is.na(sred$Srednie),]
+    ggplot(sred, aes(x = as.Date(Data), y = as.numeric(Srednie), group = 1)) +
+      geom_line(col = "blue") +
+      labs(
+        title = "Średnie ruchome miesięczne", x= "Data", y = "Średnie"
+      ) +
+      theme(title = element_text(size=20))
+  }})
+  
+  output$wykres2 <- renderPlot({
+    x <- dane()
+    if(!is.null(x)){
+    sred <- data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$Zamkniecie, sides = 2, rep(1, 40)/40)))
+    sred <- sred[!is.na(sred$Srednie),]
+    ggplot(sred, aes(x = as.Date(Data), y =as.numeric(Srednie), group = 1)) +
+      geom_line(col = "red") +
+      labs(
+        title = "Średnie ruchome dwumiesięczne", x = "Data", y = "Średnie"
+      )  +
+      theme(title = element_text(size=20))
+  }})
+  
+  stopyzwrotu <- reactive({
+    x <- dane()
+    if(!is.null(x)){
+    x <- x %>% mutate(StopyZwrotu = log(Zamkniecie/Otwarcie)) %>%
+      select(Data, StopyZwrotu)
+    return(x)
+  }})
+  output$stz <- renderTable({
+    x <- stopyzwrotu()
+    if(!is.null(stopyzwrotu())){
+    data.frame(cbind(Data = x$Data, Stopy_Zwrotu = round(x$StopyZwrotu, 5)))
+  }})
+  
+  output$stz1 <- renderTable({
+    x <- stopyzwrotu()
+    if(!is.null(x)){
+    data.frame(cbind(Data = x$Data, Średnie = round(stats::filter(x$StopyZwrotu, sides = 2, rep(1, 20)/20), 5)))
+  }})
+  
+  output$stz2 <- renderTable({
+    x <- stopyzwrotu()
+    if(!is.null(x)){
+    data.frame(cbind(Data = x$Data, Średnie = round(stats::filter(x$StopyZwrotu, sides = 2, rep(1, 40)/40), 5)))
+  }})
+  
+  output$wykres3 <- renderPlot({
+    x <- stopyzwrotu()
+    if(!is.null(x)){
+    sred <- data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$StopyZwrotu, sides = 2, rep(1, 20)/20)))
+    sred <- sred[!is.na(sred$Srednie),]
+    ggplot(sred, aes(x = as.Date(Data), y = as.numeric(Srednie), group = 1)) +
+      geom_line(col = "blue") +
+      labs(
+        title = "Średnie ruchome miesięczne logarytmów dziennych stóp zwrotu", x= "Data", y = "Średnie", 
+      )  +
+      theme(title = element_text(size=20))
+  }})
+  
+  output$wykres4 <- renderPlot({
+    x <- stopyzwrotu()
+    if(!is.null(x)){
+    sred <- data.frame(cbind(Data = x$Data, Srednie = stats::filter(x$StopyZwrotu, sides = 2, rep(1, 40)/40)))
+    sred <- sred[!is.na(sred$Srednie),]
+    ggplot(sred, aes(x = as.Date(Data), y = as.numeric(Srednie), group = 1)) +
+      geom_line(col = "red") +
+      labs(
+        title = "Średnie ruchome dwumiesięczne logarytmów dziennych stóp zwrotu", x = "Data", y= "Średnie"
+      )  +
+      theme(title = element_text(size=20))
+  }})
+}
+shinyApp(ui = ui, server = server)
+```
+
+## Źródła
+
+::: bibliografia
+-   <https://doc.arcgis.com/pl/insights/latest/analyze/moving-average.htm>
+-   <https://wzr.pl/ekonomia/logarytmiczna-stopa-zwrotu-co-to-takiego/#Czym_logarytmiczna_stopa_zwrotu_rozni_sie_od_procentowej>
+-   <https://pl.wikipedia.org/wiki/%C5%9Arednia_ruchoma>
+:::

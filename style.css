@@ -1,0 +1,104 @@
+body {
+    background-color: brown;
+}
+
+.slides > slide.backdrop {
+    background-image: linear-gradient(to top, #d2b48c, #8b4513);
+}
+
+.gdbar img {
+    width: 80px !important;
+    height: 75px !important;
+}
+
+.gdbar {
+    background-color: brown;
+}
+
+pre.language-r {
+    font-size: 10px; 
+}
+
+.slides > slide.title-slide hgroup h1 {
+    font-family: Calibri;
+    font-weight: 500;
+    font-size: 70px;
+    text-align: center;
+    color: brown1;
+}
+
+.slides > slide.title-slide hgroup h2 {
+    color: brown1;
+}
+
+.cited {
+    font-family: Arial, 'Century Gothic', 'Lucida Sans Unicode', 'Times New Roman', 'Trebuchet MS', Verdana;
+    background: #8fbc8f;
+    color: brown1;
+}
+
+.footer {
+    color: brown1;
+    font-size: 10px;
+    text-align: center;
+    bottom: 0;
+    position: absolute;
+    width: 90%;
+}
+
+.punkty {
+    margin: revert;
+    color: rgb(0, 51, 102);
+    font-style: italic;
+}
+
+h2 {
+    color: brown1;
+    font-family: Arial;
+    font-weight: 500;
+    font-size: 60px;
+}
+
+.bialy-napis {
+    color: white;
+}
+
+.bibliografia {
+    margin: auto !important;
+    color: darkseagreen;
+    font-family: Museo;
+    font-size: 20px;
+}
+
+p {
+    font-family: Arial, 'Century Gothic', 'Lucida Sans Unicode', 'Times New Roman', 'Trebuchet MS', Verdana;
+    font-size: 20px;4
+    text-align: justify;
+}
+
+table {
+   overflow: auto;
+   display: block;
+}
+
+table tbody {
+   max-height: 300px; 
+   display: block;
+   overflow-y: auto;
+}
+
+th, td {
+   text-align: center;
+   padding: 8px; 
+}
+
+.table-scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+caption {
+  caption-side: top; 
+}
+
+
